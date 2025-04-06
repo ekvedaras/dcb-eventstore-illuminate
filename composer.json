@@ -1,0 +1,59 @@
+{
+  "name": "ekvedaras/dcb-eventstore-illuminate",
+  "description": "Laravel database adapter for the Dynamic Consistency Boundary implementation",
+  "type": "package",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Ernestas Kvedaras",
+      "email": "kvedarasernestas@gmail.com"
+    }
+  ],
+  "require": {
+    "php": ">=8.3",
+    "ramsey/uuid": "^4.7",
+    "psr/clock": "^1",
+    "webmozart/assert": "^1.11",
+    "wwwision/dcb-eventstore": "^4",
+    "illuminate/database": "^12.7"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-latest",
+    "phpstan/phpstan": "^2",
+    "squizlabs/php_codesniffer": "^4.0.x-dev",
+    "phpunit/phpunit": "^11",
+    "brianium/paratest": "^7"
+  },
+  "autoload": {
+    "psr-4": {
+      "EKvedaras\\DCBEventStoreIlluminate\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "EKvedaras\\DCBEventStoreIlluminate\\Tests\\": "tests/",
+      "Wwwision\\DCBEventStore\\Tests\\": "vendor/wwwision/dcb-eventstore/tests/"
+    }
+  },
+  "scripts": {
+    "test:phpstan": "phpstan",
+    "test:cs": "phpcs --colors src",
+    "test:cs:fix": "phpcbf --colors src",
+    "test:integration": [
+      "echo $DCB_TEST_DSN",
+      "phpunit tests/Integration --exclude-group=parallel"
+    ],
+    "test:consistency": [
+      "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::prepare",
+      "paratest tests/Integration --group=parallel --functional --processes 20",
+      "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::validateEvents",
+      "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::cleanup"
+    ],
+    "test": [
+      "@test:phpstan",
+      "@test:cs",
+      "@test:integration",
+      "@test:consistency"
+    ]
+  }
+}
