@@ -160,19 +160,18 @@ final class IlluminateEventStore implements EventStore, Setupable
         $retryAttempt = 0;
         while (true) {
             try {
-                DB::enableQueryLog();
                 return $this->config->connection->transaction($statement);
-            } catch (DeadlockException $e) {
-                if ($retryAttempt >= $maxRetryAttempts) {
-                    throw new RuntimeException(sprintf('Failed after %d retry attempts', $retryAttempt), 1686565685, $e);
-                }
-                usleep((int)($retryWaitInterval * 1E6));
-                $retryAttempt ++;
-                $retryWaitInterval *= 2;
             } catch (QueryException $e) {
-                throw new RuntimeException(sprintf('Failed to commit events (error code: %d): %s', (int)$e->getCode(), $e->getMessage()), 1685956215, $e);
-            } finally {
-                DB::disableQueryLog();
+                if ($e->getCode() === 4001) {
+                    if ($retryAttempt >= $maxRetryAttempts) {
+                        throw new RuntimeException(sprintf('Failed after %d retry attempts', $retryAttempt), 1686565685, $e);
+                    }
+                    usleep((int)($retryWaitInterval * 1E6));
+                    $retryAttempt ++;
+                    $retryWaitInterval *= 2;
+                } else {
+                    throw new RuntimeException(sprintf('Failed to commit events (error code: %d): %s', (int)$e->getCode(), $e->getMessage()), 1685956215, $e);
+                }
             }
         }
     }
