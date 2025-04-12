@@ -162,7 +162,7 @@ final class IlluminateEventStore implements EventStore, Setupable
             try {
                 return $this->config->connection->transaction($statement);
             } catch (QueryException $e) {
-                if ($e->getCode() === 4001) {
+                if ($e->getCode() === 40001) {
                     if ($retryAttempt >= $maxRetryAttempts) {
                         throw new RuntimeException(sprintf('Failed after %d retry attempts', $retryAttempt), 1686565685, $e);
                     }
