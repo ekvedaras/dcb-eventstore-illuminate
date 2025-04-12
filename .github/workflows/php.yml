@@ -66,14 +66,14 @@ jobs:
       - name: Run tests (SQLite)
         run: composer run-script test
         env:
-          DCB_TEST_DSN: "pdo-sqlite:///events.sqlite"
+          DCB_TEST_DSN: "sqlite://events.sqlite"
 
       - name: Run tests (MySQL)
         run: composer run-script test
         env:
-          DCB_TEST_DSN: "pdo-mysql://root:password@127.0.0.1:${{ job.services.mysql.ports['3306'] }}/dcb"
+          DCB_TEST_DSN: "mysql://root:password@127.0.0.1:${{ job.services.mysql.ports['3306'] }}/dcb"
 
       - name: Run tests (PostgreSQL)
         run: composer run-script test
         env:
-          DCB_TEST_DSN: "pdo-pgsql://root:password@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/dcb"
+          DCB_TEST_DSN: "pgsql://root:password@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/dcb"
