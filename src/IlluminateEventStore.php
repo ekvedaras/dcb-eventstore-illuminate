@@ -26,17 +26,16 @@ use Wwwision\DCBEventStore\Types\ReadOptions;
 use Wwwision\DCBEventStore\Types\StreamQuery\Criteria\EventTypesAndTagsCriterion;
 use Wwwision\DCBEventStore\Types\StreamQuery\StreamQuery;
 
-use function implode;
 use function json_encode;
 use function sprintf;
 
 use const JSON_THROW_ON_ERROR;
 
-final class IlluminateEventStore implements EventStore, Setupable
+final readonly class IlluminateEventStore implements EventStore, Setupable
 {
 
     public function __construct(
-        private readonly IlluminateEventStoreConfiguration $config
+        private IlluminateEventStoreConfiguration $config
     ) {
     }
 
