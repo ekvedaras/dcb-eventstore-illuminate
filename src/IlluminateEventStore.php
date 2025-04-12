@@ -126,30 +126,32 @@ final class IlluminateEventStore implements EventStore, Setupable
         Assert::isInstanceOf($selects, Builder::class);
 
         $columns = ['type', 'data', 'metadata', 'tags', 'recorded_at'];
-        $statement = fn () => $this->config->connection
-            ->table($this->config->eventTableName)
-            ->insertUsing($columns, $this->config->connection
-                ->table($selects, 'new_events')
-                ->select($columns)
-                ->unless($condition->expectedHighestSequenceNumber->isAny(), function (Builder $query) use ($condition) {
-                    $sequenceQuery = $this->config->connection
-                        ->table($this->config->eventTableName, 'events')
-                        ->select('events.sequence_number')
-                        ->orderByDesc('events.sequence_number')
-                        ->limit(1);
+        $newEvents = $this->config->connection
+            ->table($selects, 'new_events')
+            ->select($columns)
+            ->unless($condition->expectedHighestSequenceNumber->isAny(), function (Builder $query) use ($condition) {
+                $sequenceQuery = $this->config->connection
+                    ->table($this->config->eventTableName, 'events')
+                    ->select('events.sequence_number')
+                    ->orderByDesc('events.sequence_number')
+                    ->limit(1);
 
-                    $this->addStreamQueryConstraints($sequenceQuery, $condition->query);
+                $this->addStreamQueryConstraints($sequenceQuery, $condition->query);
 
-                    if ($condition->expectedHighestSequenceNumber->isNone()) {
-                        $query->whereNotExists($sequenceQuery);
-                    } else {
-                        $query->where(DB::raw($condition->expectedHighestSequenceNumber->extractSequenceNumber()->value), $sequenceQuery);
-                    }
+                if ($condition->expectedHighestSequenceNumber->isNone()) {
+                    $query->whereNotExists($sequenceQuery);
+                } else {
+                    $query->where(DB::raw($condition->expectedHighestSequenceNumber->extractSequenceNumber()->value), $sequenceQuery);
+                }
 
-                    return $query;
-                }));
+                return $query;
+            });
 
-        $affectedRows = $this->commit($statement);
+        $insertQuery = $this->config->connection->table($this->config->eventTableName);
+
+        $affectedRows = $this->commit(
+            fn () => $insertQuery->insertUsing($columns, $newEvents)
+        );
 
         if ($affectedRows === 0 && !$condition->expectedHighestSequenceNumber->isAny()) {
             throw $condition->expectedHighestSequenceNumber->isNone() ? ConditionalAppendFailed::becauseNoEventWhereExpected() : ConditionalAppendFailed::becauseHighestExpectedSequenceNumberDoesNotMatch($condition->expectedHighestSequenceNumber);
@@ -166,6 +168,14 @@ final class IlluminateEventStore implements EventStore, Setupable
         $retryAttempt = 0;
         while (true) {
             try {
+                if ($this->config->connection instanceof PostgresConnection) {
+                    $this->config->connection->statement('BEGIN ISOLATION LEVEL SERIALIZABLE');
+                    $affectedRows = $statement();
+                    $this->config->connection->statement('COMMIT');
+
+                    return $affectedRows;
+                }
+
                 return $this->config->connection->transaction($statement);
             } catch (QueryException $e) {
                 if ((int) $e->getCode() === 40001) {
@@ -177,6 +187,10 @@ final class IlluminateEventStore implements EventStore, Setupable
                     $retryWaitInterval *= 2;
                 } else {
                     throw new RuntimeException(sprintf('Failed to commit events (error code: %d): %s', (int)$e->getCode(), $e->getMessage()), 1685956215, $e);
+                }
+            } finally {
+                if ($this->config->connection instanceof PostgresConnection) {
+                    $this->config->connection->statement('ROLLBACK');
                 }
             }
         }
