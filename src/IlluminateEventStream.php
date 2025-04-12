@@ -13,16 +13,16 @@ use Wwwision\DCBEventStore\Types\Event;
 use Wwwision\DCBEventStore\Types\EventEnvelope;
 use Wwwision\DCBEventStore\Types\SequenceNumber;
 
-final class IlluminateEventStream implements EventStream
+final readonly class IlluminateEventStream implements EventStream
 {
-    public function __construct(private readonly LazyCollection $result)
+    public function __construct(private LazyCollection $result)
     {
     }
 
     public function getIterator(): Traversable
     {
         foreach ($this->result as $row) {
-            yield self::databaseRowToEventEnvelope($row);
+            yield self::databaseRowToEventEnvelope((array)$row);
         }
     }
 
@@ -32,7 +32,7 @@ final class IlluminateEventStream implements EventStream
         if ($row === null) {
             return null;
         }
-        return self::databaseRowToEventEnvelope($row);
+        return self::databaseRowToEventEnvelope((array) $row);
     }
 
     // -----------------------------------

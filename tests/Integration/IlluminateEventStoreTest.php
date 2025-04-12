@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace EKvedaras\DCBEventStoreIlluminate\Tests\Integration;
 
+use EKvedaras\DCBEventStoreIlluminate\Tests\EventStoreTestCase;
 use Illuminate\Database\PostgresConnection;
 use Illuminate\Database\SQLiteConnection;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
-use Wwwision\DCBEventStore\Tests\Integration\EventStoreTestBase;
 use EKvedaras\DCBEventStoreIlluminate\IlluminateEventStore;
+
 use function getenv;
 use function is_string;
 
 #[CoversClass(IlluminateEventStore::class)]
-final class IlluminateEventStoreTest extends EventStoreTestBase
+final class IlluminateEventStoreTest extends EventStoreTestCase
 {
     protected function createEventStore(): IlluminateEventStore
     {
@@ -22,9 +23,18 @@ final class IlluminateEventStoreTest extends EventStoreTestBase
 
         $dsn = getenv('DCB_TEST_DSN');
         if (!is_string($dsn)) {
-            $dsn = 'sqlite:///events_test.sqlite';
+            $dsn = 'sqlite://test.sqlite';
+            $config = [
+                'driver' => 'sqlite',
+                'database' => str($dsn)->after('://')->toString(),
+            ];
+        } else {
+            $config = [
+                'driver' => str($dsn)->before('://')->toString(),
+                'database' => $dsn,
+            ];
         }
-        $connection = DB::connection($dsn);
+        $connection = DB::connectUsing('testing', $config);
         $eventStore = IlluminateEventStore::create($connection, $eventTableName);
         $eventStore->setup();
         if ($connection instanceof SQLiteConnection) {

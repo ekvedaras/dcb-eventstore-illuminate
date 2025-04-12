@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace EKvedaras\DCBEventStoreIlluminate;
 
+use Closure;
 use Exception;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\DeadlockException;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use JsonException;
 use RuntimeException;
 use Webmozart\Assert\Assert;
@@ -46,47 +50,25 @@ final class IlluminateEventStore implements EventStore, Setupable
     public function setup(): void
     {
         try {
-            // TODO find replacement, @see https://github.com/doctrine/dbal/blob/4.2.x/UPGRADE.md#deprecated-schemadifftosql-and-schemadifftosavesql
-            foreach ($this->getSchemaDiff()->toSaveSql($this->config->platform) as $statement) {
-                $this->config->connection->executeStatement($statement);
+            if (Schema::hasTable($this->config->eventTableName)) {
+                return;
             }
-            if ($this->config->isPostgreSQL()) {
-                $this->config->connection->executeStatement('CREATE INDEX IF NOT EXISTS tags ON ' . $this->config->eventTableName . ' USING gin (tags jsonb_path_ops)');
-            }
-        } catch (DbalException $e) {
+
+            Schema::create($this->config->eventTableName, function (Blueprint $table): void {
+                $table->increments('sequence_number');
+                $table->string('type');
+                $table->text('data');
+                $table->jsonb('metadata')->nullable();
+                $table->jsonb('tags');
+                $table->dateTime('recorded_at');
+
+                if (Schema::getConnection()->getDriverName() === 'pgsql') {
+                    $table->rawIndex("tags ON {$this->config->eventTableName} USING gin (tags jsonb_path_ops)");
+                }
+            });
+        } catch (QueryException $e) {
             throw new RuntimeException(sprintf('Failed to setup event store: %s', $e->getMessage()), 1687010035, $e);
         }
-    }
-
-    private function getSchemaDiff(): SchemaDiff
-    {
-        $schemaManager = $this->config->connection->createSchemaManager();
-        return $schemaManager->createComparator()->compareSchemas($schemaManager->introspectSchema(), $this->databaseSchema());
-    }
-
-    /**
-     * @throws SchemaException
-     */
-    private function databaseSchema(): Schema
-    {
-        $schema = new Schema();
-        $eventsTable = $schema->createTable($this->config->eventTableName);
-        // The monotonic sequence number
-        $eventsTable->addColumn('sequence_number', Types::INTEGER, ['autoincrement' => true]);
-        // The event type in the format "<BoundedContext>:<EventType>"
-        $eventsTable->addColumn('type', Types::STRING, ['length' => 255]);
-        // The event payload (usually serialized as JSON)
-        $eventsTable->addColumn('data', Types::TEXT);
-        // Optional event metadata as key-value pairs
-        $eventsTable->addColumn('metadata', Types::TEXT, ['notnull' => false, 'platformOptions' => ['jsonb' => true]]);
-        // The event tags (aka domain ids) as JSON
-        $eventsTable->addColumn('tags', Types::JSON, ['platformOptions' => ['jsonb' => true]]);
-        // When the event was appended originally
-        $eventsTable->addColumn('recorded_at', Types::DATETIME_IMMUTABLE);
-
-        $eventsTable->setPrimaryKey(['sequence_number']);
-
-        return $schema;
     }
 
     public function read(StreamQuery $query, ?ReadOptions $options = null): EventStream
@@ -108,41 +90,57 @@ final class IlluminateEventStore implements EventStore, Setupable
     {
         Assert::eq($this->config->connection->transactionLevel(), 0, 'Failed to commit events because a database transaction is active already');
 
-        $parameters = [];
-        $selects = [];
-        $eventIndex = 0;
         $now = $this->config->clock->now();
         if ($events instanceof Event) {
             $events = Events::fromArray([$events]);
         }
+
+        $selects = null;
         foreach ($events as $event) {
-            $selects[] = "SELECT :e{$eventIndex}_type type, :e{$eventIndex}_data data, :e{$eventIndex}_metadata metadata, :e{$eventIndex}_tags" . ($this->config->isPostgreSQL() ? '::jsonb' : '') . " tags, :e{$eventIndex}_recordedAt" . ($this->config->isPostgreSQL() ? '::timestamp' : '') . " recorded_at";
             try {
                 $tags = json_encode($event->tags, JSON_THROW_ON_ERROR);
             } catch (JsonException $e) {
                 throw new RuntimeException(sprintf('Failed to JSON encode tags: %s', $e->getMessage()), 1686304410, $e);
             }
-            $parameters['e' . $eventIndex . '_type'] = $event->type->value;
-            $parameters['e' . $eventIndex . '_data'] = $event->data->value;
-            $parameters['e' . $eventIndex . '_metadata'] = json_encode($event->metadata->value, JSON_THROW_ON_ERROR);
-            $parameters['e' . $eventIndex . '_tags'] = $tags;
-            $parameters['e' . $eventIndex . '_recordedAt'] = $now->format('Y-m-d H:i:s');
-            $eventIndex++;
-        }
-        $unionSelects = implode(' UNION ALL ', $selects);
 
-        $statement = "INSERT INTO {$this->config->eventTableName} (type, data, metadata, tags, recorded_at) SELECT * FROM ( $unionSelects ) new_events";
-        if (!$condition->expectedHighestSequenceNumber->isAny()) {
-            $queryBuilder = $this->config->connection->table($this->config->eventTableName)->select('events.sequence_number')->orderBy('events.sequence_number', 'DESC')->limit(1);
-            $this->addStreamQueryConstraints($queryBuilder, $condition->query);
-            if ($condition->expectedHighestSequenceNumber->isNone()) {
-                $statement .= ' WHERE NOT EXISTS (' . $queryBuilder->toSql() . ')';
+            $selectQuery = $this->config->connection->query()
+                ->selectRaw('? as type', [$event->type->value])
+                ->selectRaw('? as data', [$event->data->value])
+                ->selectRaw('? as metadata', [json_encode($event->metadata->value, JSON_THROW_ON_ERROR)])
+                ->selectRaw('? as tags', [$tags])
+                ->selectRaw('? as recorded_at', [$now->format('Y-m-d H:i:s')]);
+
+            if (!isset($selects)) {
+                $selects = $selectQuery;
             } else {
-                $statement .= ' WHERE (' . $queryBuilder->toSql() . ') = :highestSequenceNumber';
-                $parameters['highestSequenceNumber'] = $condition->expectedHighestSequenceNumber->extractSequenceNumber()->value;
+                $selects->unionAll($selectQuery);
             }
         }
-        $affectedRows = $this->commitStatement($statement, $parameters);
+
+        $columns = ['type', 'data', 'metadata', 'tags', 'recorded_at'];
+        $statement = fn () => $this->config->connection
+            ->table($this->config->eventTableName)
+            ->insertUsing($columns, $this->config->connection
+                ->table($selects, 'new_events')
+                ->select($columns)
+                ->unless($condition->expectedHighestSequenceNumber->isAny(), function (Builder $query) use ($condition) {
+                    $sequenceQuery = $this->config->connection
+                        ->table($this->config->eventTableName, 'events')
+                        ->select('events.sequence_number')
+                        ->orderBy('events.sequence_number', 'DESC')
+                        ->limit(1);
+
+                    $this->addStreamQueryConstraints($sequenceQuery, $condition->query);
+
+                    if ($condition->expectedHighestSequenceNumber->isNone()) {
+                        $query->whereNotExists($sequenceQuery);
+                    } else {
+                        $query->where(DB::raw($condition->expectedHighestSequenceNumber->extractSequenceNumber()->value), $sequenceQuery);
+                    }
+                }),);
+
+        $affectedRows = $this->commit($statement);
+
         if ($affectedRows === 0 && !$condition->expectedHighestSequenceNumber->isAny()) {
             throw $condition->expectedHighestSequenceNumber->isNone() ? ConditionalAppendFailed::becauseNoEventWhereExpected() : ConditionalAppendFailed::becauseHighestExpectedSequenceNumberDoesNotMatch($condition->expectedHighestSequenceNumber);
         }
@@ -150,24 +148,16 @@ final class IlluminateEventStore implements EventStore, Setupable
 
     // -------------------------------------
 
-    /**
-     * @param array<int<0, max>|string, mixed> $parameters
-     */
-    private function commitStatement(string $statement, array $parameters): int
+    /** @param Closure(): int $statement */
+    private function commit(Closure $statement): int
     {
         $retryWaitInterval = 0.005;
         $maxRetryAttempts = 10;
         $retryAttempt = 0;
         while (true) {
             try {
-                if ($this->config->isPostgreSQL()) {
-                    $this->config->connection->statement('BEGIN ISOLATION LEVEL SERIALIZABLE');
-                }
-                $affectedRows = (int)$this->config->connection->affectingStatement($statement, $parameters);
-                if ($this->config->isPostgreSQL()) {
-                    $this->config->connection->commit();
-                }
-                return $affectedRows;
+                DB::enableQueryLog();
+                return $this->config->connection->transaction($statement);
             } catch (DeadlockException $e) {
                 if ($retryAttempt >= $maxRetryAttempts) {
                     throw new RuntimeException(sprintf('Failed after %d retry attempts', $retryAttempt), 1686565685, $e);
@@ -178,9 +168,7 @@ final class IlluminateEventStore implements EventStore, Setupable
             } catch (QueryException $e) {
                 throw new RuntimeException(sprintf('Failed to commit events (error code: %d): %s', (int)$e->getCode(), $e->getMessage()), 1685956215, $e);
             } finally {
-                if ($this->config->isPostgreSQL()) {
-                    $this->config->connection->rollBack();
-                }
+                DB::disableQueryLog();
             }
         }
     }
@@ -190,19 +178,30 @@ final class IlluminateEventStore implements EventStore, Setupable
         if ($streamQuery->isWildcard()) {
             return;
         }
-        $criterionStatements = [];
+        $criterionSelects = null;
         foreach ($streamQuery->criteria as $criterion) {
-            $criterionQueryBuilder = $this->config->connection
-                ->table($this->config->eventTableName, 'events')
+            $select = $this->config->connection
+                ->table($this->config->eventTableName)
                 ->select('sequence_number');
-            $this->applyCriterionConstraints($criterion, $criterionQueryBuilder);
-            $criterionStatements[] = $criterionQueryBuilder->toSql();
+            $this->applyCriterionConstraints($criterion, $select);
+
+            if (!isset($criterionSelects)) {
+                $criterionSelects = $select;
+            } else {
+                $criterionSelects->unionAll($select);
+            }
         }
-        $joinQueryBuilder = $this->config->connection
-            ->table($this->config->connection->raw('(' . implode(' UNION ALL ', $criterionStatements) . ')'), 'h')
-            ->select('sequence_number')
-            ->groupBy('h.sequence_number');
-        $queryBuilder->joinSub($joinQueryBuilder, 'eh', 'eh.sequence_number', 'events.sequence_number');
+
+        $queryBuilder->joinSub(
+            $this->config->connection
+                ->query()
+                ->select('h.sequence_number')
+                ->fromSub($criterionSelects, 'h')
+                ->groupBy('h.sequence_number'),
+            'eh',
+            'eh.sequence_number',
+            'events.sequence_number'
+        );
     }
 
     private function applyCriterionConstraints(EventTypesAndTagsCriterion $criterion, Builder $queryBuilder): void
@@ -211,25 +210,13 @@ final class IlluminateEventStore implements EventStore, Setupable
             $queryBuilder->whereIn('type', $criterion->eventTypes->toStringArray());
         }
         if ($criterion->tags !== null) {
-            if ($this->config->isSQLite()) {
-                $queryBuilder->whereNotExists(
-                    $queryBuilder->newQuery()
-                        ->fromRaw('JSON_EACH(?)', $criterion->tags)
-                        ->whereNotIn(
-                            'value',
-                            $queryBuilder->newQuery()
-                                ->select('value')
-                                ->fromRaw('JSON_EACH(tags)')
-                        )
-                );
-            } elseif ($this->config->isPostgreSQL()) {
-                $queryBuilder->whereJsonContains('tags', $criterion->tags);
-            } else {
-                $queryBuilder->whereRaw('JSON_CONTAINS(tags, ?)', $criterion->tags);
+            foreach ($criterion->tags as $tag) {
+                $queryBuilder->whereJsonContains('tags', $tag->value);
             }
         }
+
         if ($criterion->onlyLastEvent) {
-            $queryBuilder->selectRaw('MAX(sequence_number) AS sequence_number');
+            $queryBuilder->select(DB::raw('MAX(sequence_number) AS sequence_number'));
         }
     }
 }

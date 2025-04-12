@@ -22,7 +22,8 @@
     "phpstan/phpstan": "^2",
     "squizlabs/php_codesniffer": "^4.0.x-dev",
     "phpunit/phpunit": "^11",
-    "brianium/paratest": "^7"
+    "brianium/paratest": "^7",
+    "orchestra/testbench": "^10.2"
   },
   "autoload": {
     "psr-4": {
