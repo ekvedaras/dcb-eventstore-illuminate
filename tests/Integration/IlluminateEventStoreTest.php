@@ -26,29 +26,23 @@ final class IlluminateEventStoreTest extends EventStoreTestCase
 
         $dsn = getenv('DCB_TEST_DSN');
         if (!is_string($dsn)) {
-            $dsn = 'sqlite://test.sqlite';
             $config = [
                 'driver' => 'sqlite',
-                'database' => str($dsn)->after('://')->toString(),
+                'database' => 'test.sqlite',
             ];
         } else {
             $config = [
                 'driver' => str($dsn)->before('://')->toString(),
-                'database' => $dsn,
+                'url' => str($dsn)->beforeLast('/')->toString(),
+                'database' => str($dsn)->afterLast('/')->toString(),
             ];
         }
         $connection = DB::connectUsing('testing', $config);
         Assert::isInstanceOf($connection, Connection::class);
         $eventStore = IlluminateEventStore::create($connection, $eventTableName);
         $eventStore->setup();
-        if ($connection instanceof SQLiteConnection) {
-            $connection->statement('DELETE FROM ' . $eventTableName);
-            $connection->statement('UPDATE SQLITE_SEQUENCE SET SEQ=0 WHERE NAME="' . $eventTableName . '"');
-        } elseif ($connection instanceof PostgresConnection) {
-            $connection->statement('TRUNCATE TABLE ' . $eventTableName . ' RESTART IDENTITY');
-        } else {
-            $connection->statement('TRUNCATE TABLE ' . $eventTableName);
-        }
+        $connection->table($eventTableName)->truncate();
+
         return $eventStore;
     }
 

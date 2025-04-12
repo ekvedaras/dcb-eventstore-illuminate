@@ -60,15 +60,15 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestCase
 
             $dsn = getenv('DCB_TEST_DSN');
             if (!is_string($dsn)) {
-                $dsn = 'sqlite://test.sqlite';
                 $config = [
                     'driver' => 'sqlite',
-                    'database' => Str::of($dsn)->after('://')->toString(),
+                    'database' => 'test.sqlite',
                 ];
             } else {
                 $config = [
                     'driver' => Str::of($dsn)->before('://')->toString(),
-                    'database' => $dsn,
+                    'url' => Str::of($dsn)->beforeLast('/')->toString(),
+                    'database' => Str::of($dsn)->afterLast('/')->toString(),
                 ];
             }
 
