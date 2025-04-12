@@ -12,16 +12,17 @@ use Illuminate\Database\DatabaseServiceProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Facade;
-use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBEventStore\EventStore;
+use Wwwision\DCBEventStore\Tests\Integration\EventStoreConcurrencyTestBase;
+
 use function getenv;
 use function is_string;
 use const PHP_EOL;
 
 #[CoversNothing]
-final class ConcurrencyTest extends EventStoreConcurrencyTestCase
+final class ConcurrencyTest extends EventStoreConcurrencyTestBase
 {
     private static ?IlluminateEventStore $eventStore = null;
     private static ?Connection $connection = null;

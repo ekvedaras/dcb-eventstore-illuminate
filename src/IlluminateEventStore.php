@@ -135,7 +135,7 @@ final class IlluminateEventStore implements EventStore, Setupable
                     $sequenceQuery = $this->config->connection
                         ->table($this->config->eventTableName, 'events')
                         ->select('events.sequence_number')
-                        ->orderBy('events.sequence_number', 'DESC')
+                        ->orderByDesc('events.sequence_number')
                         ->limit(1);
 
                     $this->addStreamQueryConstraints($sequenceQuery, $condition->query);
