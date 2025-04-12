@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace EKvedaras\DCBEventStoreIlluminate\Tests\Integration;
 
 use EKvedaras\DCBEventStoreIlluminate\Tests\EventStoreTestCase;
+use Illuminate\Database\Connection;
 use Illuminate\Database\PostgresConnection;
 use Illuminate\Database\SQLiteConnection;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use EKvedaras\DCBEventStoreIlluminate\IlluminateEventStore;
+
+use Webmozart\Assert\Assert;
 
 use function getenv;
 use function is_string;
@@ -35,6 +38,7 @@ final class IlluminateEventStoreTest extends EventStoreTestCase
             ];
         }
         $connection = DB::connectUsing('testing', $config);
+        Assert::isInstanceOf($connection, Connection::class);
         $eventStore = IlluminateEventStore::create($connection, $eventTableName);
         $eventStore->setup();
         if ($connection instanceof SQLiteConnection) {

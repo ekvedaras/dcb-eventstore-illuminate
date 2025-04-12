@@ -6,6 +6,7 @@ namespace EKvedaras\DCBEventStoreIlluminate;
 
 use DateTimeImmutable;
 use Illuminate\Support\LazyCollection;
+use stdClass;
 use Traversable;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBEventStore\EventStream;
@@ -15,8 +16,10 @@ use Wwwision\DCBEventStore\Types\SequenceNumber;
 
 final readonly class IlluminateEventStream implements EventStream
 {
-    public function __construct(private LazyCollection $result)
-    {
+    public function __construct(
+        /** @var LazyCollection<int, stdClass> */
+        private LazyCollection $result,
+    ) {
     }
 
     public function getIterator(): Traversable

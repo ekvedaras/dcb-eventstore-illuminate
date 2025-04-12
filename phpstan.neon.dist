@@ -3,3 +3,6 @@ parameters:
   treatPhpDocTypesAsCertain: false
   paths:
     - src
+
+includes:
+    - vendor/larastan/larastan/extension.neon

@@ -6,6 +6,7 @@ namespace EKvedaras\DCBEventStoreIlluminate;
 
 use Closure;
 use Exception;
+use Illuminate\Database\Connection;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\DeadlockException;
 use Illuminate\Database\Query\Builder;
@@ -41,7 +42,7 @@ final class IlluminateEventStore implements EventStore, Setupable
     ) {
     }
 
-    public static function create(ConnectionInterface $connection, string $eventTableName): self
+    public static function create(Connection $connection, string $eventTableName): self
     {
         $config = IlluminateEventStoreConfiguration::create($connection, $eventTableName);
         return new self($config);
@@ -63,7 +64,7 @@ final class IlluminateEventStore implements EventStore, Setupable
                 $table->dateTime('recorded_at');
 
                 if (Schema::getConnection()->getDriverName() === 'pgsql') {
-                    $table->rawIndex("tags ON {$this->config->eventTableName} USING gin (tags jsonb_path_ops)");
+                    $table->rawIndex('gin (tags jsonb_path_ops)', 'tags');
                 }
             });
         } catch (QueryException $e) {
@@ -116,6 +117,7 @@ final class IlluminateEventStore implements EventStore, Setupable
                 $selects->unionAll($selectQuery);
             }
         }
+        Assert::isInstanceOf($selects, Builder::class);
 
         $columns = ['type', 'data', 'metadata', 'tags', 'recorded_at'];
         $statement = fn () => $this->config->connection
@@ -137,7 +139,9 @@ final class IlluminateEventStore implements EventStore, Setupable
                     } else {
                         $query->where(DB::raw($condition->expectedHighestSequenceNumber->extractSequenceNumber()->value), $sequenceQuery);
                     }
-                }),);
+
+                    return $query;
+                }));
 
         $affectedRows = $this->commit($statement);
 
@@ -191,6 +195,8 @@ final class IlluminateEventStore implements EventStore, Setupable
                 $criterionSelects->unionAll($select);
             }
         }
+
+        Assert::isInstanceOf($criterionSelects, Builder::class);
 
         $queryBuilder->joinSub(
             $this->config->connection
