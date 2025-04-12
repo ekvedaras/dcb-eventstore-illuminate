@@ -64,7 +64,7 @@ jobs:
         run: composer install --prefer-dist --no-progress
 
       - name: Run tests (SQLite)
-        run: composer run-script test
+        run: touch events.sqlite && composer run-script test
         env:
           DCB_TEST_DSN: "sqlite://events.sqlite"
 
