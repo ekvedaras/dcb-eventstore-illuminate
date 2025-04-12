@@ -31,10 +31,14 @@ final class IlluminateEventStoreTest extends EventStoreTestCase
                 'database' => 'test.sqlite',
             ];
         } else {
+            $parts = parse_url($dsn);
             $config = [
-                'driver' => str($dsn)->before('://')->toString(),
-                'url' => str($dsn)->beforeLast('/')->toString(),
-                'database' => str($dsn)->afterLast('/')->toString(),
+                'driver' => $parts['scheme'],
+                'host' => $parts['host'],
+                'port' => $parts['port'] ?? null,
+                'database' => str($parts['path'] ?? $dsn)->afterLast('/')->toString(),
+                'username' => $parts['user'] ?? null,
+                'password' => $parts['pass'] ?? null,
             ];
         }
         $connection = DB::connectUsing('testing', $config);

@@ -65,10 +65,14 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestCase
                     'database' => 'test.sqlite',
                 ];
             } else {
+                $parts = parse_url($dsn);
                 $config = [
-                    'driver' => Str::of($dsn)->before('://')->toString(),
-                    'url' => Str::of($dsn)->beforeLast('/')->toString(),
-                    'database' => Str::of($dsn)->afterLast('/')->toString(),
+                    'driver' => $parts['scheme'],
+                    'host' => $parts['host'],
+                    'port' => $parts['port'] ?? null,
+                    'database' => str($parts['path'] ?? $dsn)->afterLast('/')->toString(),
+                    'username' => $parts['user'] ?? null,
+                    'password' => $parts['pass'] ?? null,
                 ];
             }
 
