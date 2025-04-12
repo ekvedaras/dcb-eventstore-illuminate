@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace EKvedaras\DCBEventStoreIlluminate;
 
 use Closure;
-use Exception;
 use Illuminate\Database\Connection;
-use Illuminate\Database\ConnectionInterface;
-use Illuminate\Database\DeadlockException;
+use Illuminate\Database\PostgresConnection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\Schema\Blueprint;
@@ -64,7 +62,7 @@ final class IlluminateEventStore implements EventStore, Setupable
                 $table->dateTime('recorded_at');
 
                 if (Schema::getConnection()->getDriverName() === 'pgsql') {
-                    $table->rawIndex('gin (tags jsonb_path_ops)', 'tags');
+                    $table->rawIndex('using gin (tags jsonb_path_ops)', 'tags');
                 }
             });
         } catch (QueryException $e) {
@@ -107,9 +105,17 @@ final class IlluminateEventStore implements EventStore, Setupable
             $selectQuery = $this->config->connection->query()
                 ->selectRaw('? as type', [$event->type->value])
                 ->selectRaw('? as data', [$event->data->value])
-                ->selectRaw('? as metadata', [json_encode($event->metadata->value, JSON_THROW_ON_ERROR)])
-                ->selectRaw('? as tags', [$tags])
-                ->selectRaw('? as recorded_at', [$now->format('Y-m-d H:i:s')]);
+                ->when($this->config->connection instanceof PostgresConnection, function (Builder $query) use ($now, $tags, $event) {
+                    $query
+                        ->selectRaw('?::jsonb as metadata', [json_encode($event->metadata->value, JSON_THROW_ON_ERROR)])
+                        ->selectRaw('?::jsonb as tags', [$tags])
+                        ->selectRaw('?::timestamp as recorded_at', [$now->format('Y-m-d H:i:s')]);
+                }, function (Builder $query) use ($now, $tags, $event) {
+                    $query
+                        ->selectRaw('? as metadata', [json_encode($event->metadata->value, JSON_THROW_ON_ERROR)])
+                        ->selectRaw('? as tags', [$tags])
+                        ->selectRaw('? as recorded_at', [$now->format('Y-m-d H:i:s')]);
+                });
 
             if (!isset($selects)) {
                 $selects = $selectQuery;
