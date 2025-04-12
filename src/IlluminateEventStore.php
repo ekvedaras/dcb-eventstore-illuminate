@@ -60,11 +60,11 @@ final class IlluminateEventStore implements EventStore, Setupable
                 $table->jsonb('metadata')->nullable();
                 $table->jsonb('tags');
                 $table->dateTime('recorded_at');
-
-                if (Schema::getConnection()->getDriverName() === 'pgsql') {
-                    $table->rawIndex('using gin (tags jsonb_path_ops)', 'tags');
-                }
             });
+
+            if (Schema::getConnection()->getDriverName() === 'pgsql') {
+                DB::statement("create index tags on {$this->config->eventTableName} using gin(tags jsonb_path_ops)");
+            }
         } catch (QueryException $e) {
             throw new RuntimeException(sprintf('Failed to setup event store: %s', $e->getMessage()), 1687010035, $e);
         }
