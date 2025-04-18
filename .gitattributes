@@ -2,3 +2,6 @@
 tests export-ignore
 workbench export-ignore
 testbench.yaml export-ignore
+phpunit.xml export-ignore
+phpstan.neon.dist export-ignore
+phpcs.xml export-ignore
