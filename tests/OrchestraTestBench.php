@@ -11,11 +11,24 @@ use \Orchestra\Testbench\Concerns;
 
 trait OrchestraTestBench
 {
+    use Testing\RefreshDatabase;
     use Concerns\Testing;
+    use Testing\Concerns\InteractsWithAuthentication;
+    use Testing\Concerns\InteractsWithConsole;
     use Testing\Concerns\InteractsWithContainer;
     use Testing\Concerns\InteractsWithDatabase;
+    use Testing\Concerns\InteractsWithDeprecationHandling;
     use Testing\Concerns\InteractsWithExceptionHandling;
+    use Testing\Concerns\InteractsWithSession;
     use Testing\Concerns\InteractsWithTime;
+    use Testing\Concerns\InteractsWithViews;
+    use Testing\Concerns\MakesHttpRequests;
+    use Concerns\WithWorkbench;
+    use DefineEnvironment {
+        DefineEnvironment::defineEnvironment insteadof Concerns\Testing;
+    }
+
+    protected $connectionsToTransact = [];
 
     /**
      * The base URL to use while testing the application.
@@ -43,7 +56,7 @@ trait OrchestraTestBench
      *
      * @return void
      */
-    #[Override]
+    #[\Override]
     protected function setUp(): void
     {
         $this->setUpTheTestEnvironment();
@@ -54,7 +67,7 @@ trait OrchestraTestBench
      *
      * @return void
      */
-    #[Override]
+    #[\Override]
     protected function tearDown(): void
     {
         $this->tearDownTheTestEnvironment();
@@ -78,23 +91,33 @@ trait OrchestraTestBench
      */
     protected function setUpTheTestEnvironmentTraitToBeIgnored(string $use): bool
     {
-        return in_array($use, [
+        return \in_array($use, [
             Testing\RefreshDatabase::class,
             Testing\DatabaseMigrations::class,
             Testing\DatabaseTransactions::class,
+            Testing\WithoutMiddleware::class,
+            Testing\WithFaker::class,
+            Testing\Concerns\InteractsWithAuthentication::class,
+            Testing\Concerns\InteractsWithConsole::class,
             Testing\Concerns\InteractsWithContainer::class,
             Testing\Concerns\InteractsWithDatabase::class,
+            Testing\Concerns\InteractsWithDeprecationHandling::class,
             Testing\Concerns\InteractsWithExceptionHandling::class,
+            Testing\Concerns\InteractsWithSession::class,
             Testing\Concerns\InteractsWithTime::class,
+            Testing\Concerns\InteractsWithViews::class,
+            Testing\Concerns\MakesHttpRequests::class,
             Concerns\ApplicationTestingHooks::class,
             Concerns\CreatesApplication::class,
             Concerns\HandlesAnnotations::class,
             Concerns\HandlesDatabases::class,
+            Concerns\HandlesRoutes::class,
             Concerns\InteractsWithPest::class,
             Concerns\InteractsWithPHPUnit::class,
             Concerns\InteractsWithTestCase::class,
             Concerns\InteractsWithWorkbench::class,
             Concerns\Testing::class,
+            Concerns\WithFactories::class,
             Concerns\WithLaravelBootstrapFile::class,
             Concerns\WithWorkbench::class,
         ]);
@@ -108,8 +131,6 @@ trait OrchestraTestBench
     protected function refreshApplication()
     {
         $this->app = $this->createApplication();
-
-        Facade::setFacadeApplication($this->app);
     }
 
     /**
@@ -119,7 +140,7 @@ trait OrchestraTestBench
      *
      * @codeCoverageIgnore
      */
-    #[Override]
+    #[\Override]
     public static function setUpBeforeClass(): void
     {
         static::setUpBeforeClassUsingPHPUnit();
@@ -140,7 +161,7 @@ trait OrchestraTestBench
      *
      * @codeCoverageIgnore
      */
-    #[Override]
+    #[\Override]
     public static function tearDownAfterClass(): void
     {
         static::tearDownAfterClassUsingWorkbench();

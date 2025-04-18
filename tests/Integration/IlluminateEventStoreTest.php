@@ -4,50 +4,28 @@ declare(strict_types=1);
 
 namespace EKvedaras\DCBEventStoreIlluminate\Tests\Integration;
 
-use EKvedaras\DCBEventStoreIlluminate\Tests\EventStoreTestCase;
+use EKvedaras\DCBEventStoreIlluminate\Tests\OrchestraTestBench;
 use Illuminate\Database\Connection;
-use Illuminate\Database\PostgresConnection;
-use Illuminate\Database\SQLiteConnection;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\CoversClass;
 use EKvedaras\DCBEventStoreIlluminate\IlluminateEventStore;
 
 use Webmozart\Assert\Assert;
 
-use function getenv;
-use function is_string;
+use Wwwision\DCBEventStore\Tests\Integration\EventStoreTestBase;
 
 #[CoversClass(IlluminateEventStore::class)]
-final class IlluminateEventStoreTest extends EventStoreTestCase
+final class IlluminateEventStoreTest extends EventStoreTestBase
 {
+    use OrchestraTestBench;
+
     protected function createEventStore(): IlluminateEventStore
     {
-        $eventTableName = 'dcb_events_test';
-
-        $dsn = getenv('DCB_TEST_DSN');
-        if (!is_string($dsn)) {
-            $config = [
-                'driver' => 'sqlite',
-                'database' => 'test.sqlite',
-            ];
-        } else {
-            $parts = parse_url($dsn);
-            $config = [
-                'driver' => $parts['scheme'],
-                'host' => $parts['host'],
-                'port' => $parts['port'] ?? null,
-                'database' => str($parts['path'] ?? $dsn)->afterLast('/')->toString(),
-                'username' => $parts['user'] ?? null,
-                'password' => $parts['pass'] ?? null,
-            ];
-        }
-        $connection = DB::connectUsing('testing', $config);
+        $connection = DB::connection('testing');
         Assert::isInstanceOf($connection, Connection::class);
-        $eventStore = IlluminateEventStore::create($connection, $eventTableName);
-        $eventStore->setup();
-        $connection->table($eventTableName)->truncate();
+        $eventStore = IlluminateEventStore::create($connection, config('dcb_event_store.events_table_name'));
+        $connection->table(config('dcb_event_store.events_table_name'))->truncate();
 
         return $eventStore;
     }
-
 }

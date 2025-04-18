@@ -9,16 +9,15 @@ use Illuminate\Database\Connection;
 use Illuminate\Database\PostgresConnection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\LazyCollection;
 use JsonException;
 use RuntimeException;
+use stdClass;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBEventStore\EventStore;
 use Wwwision\DCBEventStore\EventStream;
 use Wwwision\DCBEventStore\Exceptions\ConditionalAppendFailed;
-use Wwwision\DCBEventStore\Setupable;
 use Wwwision\DCBEventStore\Types\AppendCondition;
 use Wwwision\DCBEventStore\Types\Event;
 use Wwwision\DCBEventStore\Types\Events;
@@ -31,9 +30,8 @@ use function sprintf;
 
 use const JSON_THROW_ON_ERROR;
 
-final readonly class IlluminateEventStore implements EventStore, Setupable
+final readonly class IlluminateEventStore implements EventStore
 {
-
     public function __construct(
         private IlluminateEventStoreConfiguration $config
     ) {
@@ -43,30 +41,6 @@ final readonly class IlluminateEventStore implements EventStore, Setupable
     {
         $config = IlluminateEventStoreConfiguration::create($connection, $eventTableName);
         return new self($config);
-    }
-
-    public function setup(): void
-    {
-        try {
-            if (Schema::hasTable($this->config->eventTableName)) {
-                return;
-            }
-
-            Schema::create($this->config->eventTableName, function (Blueprint $table): void {
-                $table->increments('sequence_number');
-                $table->string('type');
-                $table->text('data');
-                $table->jsonb('metadata')->nullable();
-                $table->jsonb('tags');
-                $table->dateTime('recorded_at');
-            });
-
-            if (Schema::getConnection()->getDriverName() === 'pgsql') {
-                DB::statement("create index tags on {$this->config->eventTableName} using gin(tags jsonb_path_ops)");
-            }
-        } catch (QueryException $e) {
-            throw new RuntimeException(sprintf('Failed to setup event store: %s', $e->getMessage()), 1687010035, $e);
-        }
     }
 
     public function read(StreamQuery $query, ?ReadOptions $options = null): EventStream
@@ -81,7 +55,11 @@ final readonly class IlluminateEventStore implements EventStore, Setupable
             $queryBuilder->where('events.sequence_number', $operator, $options->from->value);
         }
         $this->addStreamQueryConstraints($queryBuilder, $query);
-        return new IlluminateEventStream($queryBuilder->cursor());
+
+        /** @var LazyCollection<int, stdClass> $cursor */
+        $cursor = $queryBuilder->cursor();
+
+        return new IlluminateEventStream($cursor);
     }
 
     public function append(Events|Event $events, AppendCondition $condition): void
