@@ -59,7 +59,7 @@ jobs:
             ${{ runner.os }}-php-
 
       - name: Install dependencies
-        run: composer install --prefer-dist --no-progress --prefer-${{ matrix.package-versions }}
+        run: composer update --prefer-dist --no-progress --prefer-${{ matrix.package-versions }}
 
       - name: Run tests (SQLite)
         run: touch events.sqlite && composer run-script test
