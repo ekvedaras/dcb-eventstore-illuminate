@@ -41,7 +41,7 @@ return new class extends Migration {
         $tableNames = Arr::wrap(config('dcb_event_store.events_table_name'));
 
         foreach ($tableNames as $tableName) {
-            Assert::stringNotEmpty($tableNames);
+            Assert::stringNotEmpty($tableName);
             Schema::dropIfExists($tableName);
         }
     }
