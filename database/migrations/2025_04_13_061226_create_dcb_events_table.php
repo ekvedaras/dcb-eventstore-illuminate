@@ -31,7 +31,7 @@ return new class extends Migration {
             });
 
             if (Schema::getConnection()->getDriverName() === 'pgsql') {
-                DB::statement("create index tags on {$tableName} using gin(tags jsonb_path_ops)");
+                DB::statement("create index {$tableName}_tags on {$tableName} using gin(tags jsonb_path_ops)");
             }
         }
     }
