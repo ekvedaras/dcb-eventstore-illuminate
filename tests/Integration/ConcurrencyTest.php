@@ -56,8 +56,13 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestBase
             if (file_exists(__DIR__ . '/../../vendor/symfony/polyfill-php85/bootstrap.php')) {
                 require __DIR__ . '/../../vendor/symfony/polyfill-php85/bootstrap.php';
             }
+
             require __DIR__ . '/../../vendor/laravel/framework/src/Illuminate/Support/helpers.php';
             require __DIR__ . '/../../vendor/laravel/framework/src/Illuminate/Collections/helpers.php';
+
+            if (file_exists(__DIR__ . '/../../vendor/laravel/framework/src/Illuminate/Collections/functions.php')) {
+                require __DIR__ . '/../../vendor/laravel/framework/src/Illuminate/Collections/functions.php';
+            }
 
             $app = new Application();
             $app->instance('config', new Repository([]));
