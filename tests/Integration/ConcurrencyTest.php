@@ -53,8 +53,10 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestBase
     private static function connection(): Connection
     {
         if (self::$connection === null) {
+            require __DIR__ . '/../../vendor/symfony/polyfill-php85/bootstrap.php';
             require __DIR__ . '/../../vendor/laravel/framework/src/Illuminate/Support/helpers.php';
             require __DIR__ . '/../../vendor/laravel/framework/src/Illuminate/Collections/helpers.php';
+            require __DIR__ . '/../../vendor/laravel/framework/src/Illuminate/Collections/functions.php';
 
             $app = new Application();
             $app->instance('config', new Repository([]));
