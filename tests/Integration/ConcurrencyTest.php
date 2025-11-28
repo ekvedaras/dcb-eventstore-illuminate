@@ -12,6 +12,7 @@ use Illuminate\Database\DatabaseServiceProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Facade;
+use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBEventStore\EventStore;
@@ -40,6 +41,12 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestBase
     {
         $connection = self::connection();
         $connection->table(self::$eventTableName)->truncate();
+    }
+
+    #[After]
+    public function __internalDisableErrorHandler(): void
+    {
+        restore_exception_handler();
     }
 
     protected static function createEventStore(): EventStore
