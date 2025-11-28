@@ -47,7 +47,8 @@
         "test:cs:fix": "phpcbf --colors src",
         "test:integration": [
             "echo $DCB_TEST_DSN",
-            "phpunit tests/Integration --exclude-group=parallel --exclude-group=feature_liveStream --exclude-group=feature_appendConditionWithoutMatchingEvent"
+            "phpunit tests/Integration/IlluminateEventStoreTest.php  --exclude-group=parallel --exclude-group=feature_liveStream --exclude-group=feature_appendConditionWithoutMatchingEvent",
+            "phpunit tests/Integration --exclude-filter='EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\IlluminateEventStoreTest' --exclude-group=parallel --exclude-group=feature_liveStream --exclude-group=feature_appendConditionWithoutMatchingEvent"
         ],
         "test:consistency": [
             "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::prepare",
