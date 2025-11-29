@@ -12,6 +12,7 @@ use Illuminate\Database\DatabaseServiceProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Facade;
+use PHPUnit\Framework\Attributes\AfterClass;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBEventStore\EventStore;
@@ -76,5 +77,11 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestBase
             self::$connection = $connection;
         }
         return self::$connection;
+    }
+
+    #[AfterClass]
+    public static function validate(): void
+    {
+        self::validateEvents();
     }
 }

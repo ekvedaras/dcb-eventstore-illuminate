@@ -51,8 +51,7 @@
         ],
         "test:consistency": [
             "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::prepare",
-            "paratest tests/Integration --group=parallel --functional",
-            "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::validateEvents",
+            "paratest tests/Integration --group=parallel --functional --processes=20",
             "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::cleanup"
         ],
         "test": [
