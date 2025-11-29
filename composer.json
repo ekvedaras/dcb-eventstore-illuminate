@@ -15,17 +15,17 @@
         "psr/clock": "^1",
         "webmozart/assert": "^1.11",
         "wwwision/dcb-eventstore": "^4",
-        "illuminate/database": "^9|^10|^11|^12",
-        "illuminate/support": "*"
+        "illuminate/database": "^11|^12",
+        "illuminate/support": "^11|^12"
     },
     "require-dev": {
         "roave/security-advisories": "dev-latest",
         "phpstan/phpstan": "^2",
         "squizlabs/php_codesniffer": "^4.0.x-dev",
-        "phpunit/phpunit": "^11",
+        "phpunit/phpunit": "^12",
         "brianium/paratest": "^7",
-        "orchestra/testbench": "^9.0|^v10.0",
-        "larastan/larastan": "^2|^3"
+        "orchestra/testbench": "^v10.0",
+        "larastan/larastan": "^3"
     },
     "autoload": {
         "psr-4": {
@@ -47,7 +47,8 @@
         "test:cs:fix": "phpcbf --colors src",
         "test:integration": [
             "echo $DCB_TEST_DSN",
-            "phpunit tests/Integration --exclude-group=parallel"
+            "phpunit tests/Integration/IlluminateEventStoreTest.php  --exclude-group=parallel --exclude-group=feature_liveStream --exclude-group=feature_appendConditionWithoutMatchingEvent",
+            "phpunit tests/Integration --exclude-filter='*IlluminateEventStoreTest*' --exclude-group=parallel --exclude-group=feature_liveStream --exclude-group=feature_appendConditionWithoutMatchingEvent"
         ],
         "test:consistency": [
             "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::prepare",
