@@ -12,8 +12,9 @@ use Illuminate\Database\DatabaseServiceProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Facade;
-use PHPUnit\Framework\Attributes\AfterClass;
 use PHPUnit\Framework\Attributes\CoversNothing;
+use PHPUnit\Framework\Attributes\Depends;
+use PHPUnit\Framework\Attributes\Test;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBEventStore\EventStore;
 use Wwwision\DCBEventStore\Tests\Integration\EventStoreConcurrencyTestBase;
@@ -79,8 +80,9 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestBase
         return self::$connection;
     }
 
-    #[AfterClass]
-    public static function validate(): void
+    #[Test]
+    #[Depends('test_consistency')]
+    public function validate(): void
     {
         self::validateEvents();
     }
