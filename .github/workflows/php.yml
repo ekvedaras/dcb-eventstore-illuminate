@@ -61,17 +61,34 @@ jobs:
       - name: Install dependencies
         run: composer update --prefer-dist --no-progress --prefer-${{ matrix.package-versions }}
 
+      - name: Run static analysis
+        run: composer run-script test:phpstan
+
+      - name: Run code style checks
+        run: composer run-script test:cs
+
       - name: Run tests (SQLite)
-        run: touch events.sqlite && composer run-script test
-        env:
-          DCB_TEST_DSN: "sqlite://events.sqlite"
+        run: composer run-script test:integration
 
       - name: Run tests (MySQL)
-        run: composer run-script test
+        run: composer run-script test:integration
         env:
-          DCB_TEST_DSN: "mysql://root:password@127.0.0.1:${{ job.services.mysql.ports['3306'] }}/dcb"
+          DCB_TEST_DSN: "mysql://root:password@127.0.0.1:${{ job.services.mysql.ports[3306] }}/dcb"
 
       - name: Run tests (PostgreSQL)
-        run: composer run-script test
+        run: composer run-script test:integration
         env:
-          DCB_TEST_DSN: "pgsql://root:password@127.0.0.1:${{ job.services.postgres.ports['5432'] }}/dcb"
+          DCB_TEST_DSN: "pgsql://root:password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/dcb"
+
+      - name: Run consistency tests (SQLite)
+        run: composer run-script test:consistency
+
+      - name: Run consistency tests (MySQL)
+        run: composer run-script test:consistency
+        env:
+          DCB_TEST_DSN: "mysql://root:password@127.0.0.1:${{ job.services.mysql.ports[3306] }}/dcb"
+
+      - name: Run consistency tests (PostgreSQL)
+        run: composer run-script test:consistency
+        env:
+          DCB_TEST_DSN: "pgsql://root:password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/dcb"
