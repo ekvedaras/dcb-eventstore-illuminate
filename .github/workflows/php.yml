@@ -69,7 +69,7 @@ jobs:
       - name: Run tests (MySQL)
         run: composer run-script test
         env:
-          DCB_TEST_DSN: "mysql://root:password@127.0.0.1:${{ job.services.mysql.ports['3306'] }}/dcb${{ matrix.php-versions }}-${{ matrix.package-versions }}"
+          DCB_TEST_DSN: "mysql://root:password@127.0.0.1:${{ job.services.mysql.ports['3306'] }}/dcb-${{ matrix.php-versions }}-${{ matrix.package-versions }}"
 
       - name: Run tests (PostgreSQL)
         run: composer run-script test
