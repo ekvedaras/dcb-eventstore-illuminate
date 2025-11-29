@@ -44,6 +44,11 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestBase
         echo PHP_EOL . 'Prepared tables for ' . $connection::class . PHP_EOL;
     }
 
+    public static function restoreHandler(): void
+    {
+        restore_exception_handler();
+    }
+
     public static function cleanup(): void
     {
         $connection = self::connection();
