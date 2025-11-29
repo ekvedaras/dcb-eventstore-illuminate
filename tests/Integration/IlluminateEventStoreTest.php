@@ -7,7 +7,6 @@ namespace EKvedaras\DCBEventStoreIlluminate\Tests\Integration;
 use EKvedaras\DCBEventStoreIlluminate\Tests\OrchestraTestBench;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
-use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\Attributes\CoversClass;
 use EKvedaras\DCBEventStoreIlluminate\IlluminateEventStore;
 
@@ -19,12 +18,6 @@ use Wwwision\DCBEventStore\Tests\Integration\EventStoreTestBase;
 final class IlluminateEventStoreTest extends EventStoreTestBase
 {
     use OrchestraTestBench;
-
-    #[After]
-    public function __internalDisableErrorHandler(): void
-    {
-        restore_exception_handler();
-    }
 
     protected function createEventStore(): IlluminateEventStore
     {

@@ -3,4 +3,5 @@
 vendor/
 composer.lock
 test.sqlite
+events.sqlite
 workbench/bootstrap/cache

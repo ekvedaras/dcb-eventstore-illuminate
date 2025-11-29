@@ -21,10 +21,10 @@
     "require-dev": {
         "roave/security-advisories": "dev-latest",
         "phpstan/phpstan": "^2",
-        "squizlabs/php_codesniffer": "^4.0.x-dev",
-        "phpunit/phpunit": "^11|^12",
+        "squizlabs/php_codesniffer": "^4.0.1",
+        "phpunit/phpunit": "^12",
         "brianium/paratest": "^7",
-        "orchestra/testbench": "^9|^10",
+        "orchestra/testbench": "^10",
         "larastan/larastan": "^3"
     },
     "autoload": {
@@ -47,12 +47,11 @@
         "test:cs:fix": "phpcbf --colors src",
         "test:integration": [
             "echo $DCB_TEST_DSN",
-            "phpunit tests/Integration/IlluminateEventStoreTest.php  --exclude-group=parallel --exclude-group=feature_liveStream --exclude-group=feature_appendConditionWithoutMatchingEvent"
+            "phpunit tests/Integration/IlluminateEventStoreTest.php --exclude-group=parallel --exclude-group=feature_liveStream --exclude-group=feature_appendConditionWithoutMatchingEvent"
         ],
         "test:consistency": [
             "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::prepare",
-            "paratest tests/Integration --group=parallel --functional --processes 20",
-            "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::restoreHandler",
+            "paratest tests/Integration --group=parallel --functional",
             "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::validateEvents",
             "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::cleanup"
         ],

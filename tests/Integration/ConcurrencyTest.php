@@ -12,7 +12,6 @@ use Illuminate\Database\DatabaseServiceProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Facade;
-use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBEventStore\EventStore;
@@ -28,13 +27,6 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestBase
     private static ?IlluminateEventStore $eventStore = null;
     private static ?Connection $connection = null;
 
-
-    #[After]
-    public function __internalDisableErrorHandler(): void
-    {
-        restore_exception_handler();
-    }
-
     public static function prepare(): void
     {
         $connection = self::connection();
@@ -42,11 +34,6 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestBase
         $connection->table(self::$eventTableName)->truncate();
 
         echo PHP_EOL . 'Prepared tables for ' . $connection::class . PHP_EOL;
-    }
-
-    public static function restoreHandler(): void
-    {
-        restore_exception_handler();
     }
 
     public static function cleanup(): void
