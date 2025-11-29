@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Facade;
 use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\Depends;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBEventStore\EventStore;
@@ -82,6 +83,7 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestBase
 
     #[Test]
     #[Depends('test_consistency')]
+    #[Group('parallel')]
     public function validate(): void
     {
         self::validateEvents();
