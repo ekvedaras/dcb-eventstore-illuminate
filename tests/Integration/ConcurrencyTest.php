@@ -82,8 +82,7 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestBase
     }
 
     #[Test]
-    #[Depends('test_consistency')]
-    #[Group('parallel')]
+    #[Group('validate')]
     public function validate(): void
     {
         self::validateEvents();

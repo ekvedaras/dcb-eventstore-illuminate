@@ -52,6 +52,7 @@
         "test:consistency": [
             "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::prepare",
             "paratest tests/Integration --group=parallel --functional --processes=20",
+            "phpunit tests/Integration/ConcurrencyTest.php --group=validate",
             "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::cleanup"
         ],
         "test": [
