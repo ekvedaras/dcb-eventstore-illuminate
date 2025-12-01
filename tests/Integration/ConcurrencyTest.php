@@ -73,7 +73,7 @@ final class ConcurrencyTest extends EventStoreConcurrencyTestBase
 
             self::defineEnvironment($app);
 
-            $connection = DB::connection('testing',);
+            $connection = DB::connection('testing');
             Assert::isInstanceOf($connection, Connection::class);
 
             self::$connection = $connection;
