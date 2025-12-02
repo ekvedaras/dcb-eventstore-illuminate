@@ -142,7 +142,7 @@ final readonly class IlluminateEventStore implements EventStore
     {
         // todo: make retry strategies configurable
         $retryWaitInterval = 0.1;
-        $maxRetryAttempts = 50;
+        $maxRetryAttempts = 10;
         $retryAttempt = 0;
         while (true) {
             try {
