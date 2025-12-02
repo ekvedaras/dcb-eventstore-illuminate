@@ -55,6 +55,10 @@
             "phpunit tests/Integration/ConcurrencyTest.php --group=validate",
             "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::cleanup"
         ],
+        "phpunit" : [
+          "@test:integration",
+          "@test:consistency"
+        ],
         "test": [
             "@test:phpstan",
             "@test:cs",

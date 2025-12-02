@@ -140,8 +140,9 @@ final readonly class IlluminateEventStore implements EventStore
     /** @param Closure(): int $statement */
     private function commit(Closure $statement): int
     {
-        $retryWaitInterval = 0.005;
-        $maxRetryAttempts = 10;
+        // todo: make retry strategies configurable
+        $retryWaitInterval = 0.1;
+        $maxRetryAttempts = 50;
         $retryAttempt = 0;
         while (true) {
             try {
@@ -161,7 +162,7 @@ final readonly class IlluminateEventStore implements EventStore
                     }
                     usleep((int)($retryWaitInterval * 1E6));
                     $retryAttempt ++;
-                    $retryWaitInterval *= 2;
+                    $retryWaitInterval *= 3;
                 } else {
                     throw new RuntimeException(sprintf('Failed to commit events (error code: %d): %s', (int)$e->getCode(), $e->getMessage()), 1685956215, $e);
                 }
