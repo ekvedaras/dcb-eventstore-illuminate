@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EKvedaras\DCBEventStoreIlluminate;
 
+use EKvedaras\DCBEventStoreIlluminate\CommitRetries\BackoffExponentially;
 use EKvedaras\DCBEventStoreIlluminate\CommitRetries\BackoffLinearly;
 use EKvedaras\DCBEventStoreIlluminate\CommitRetries\BackoffStrategy;
 use EKvedaras\DCBEventStoreIlluminate\CommitRetries\CommitRetryStrategy;
@@ -19,7 +20,7 @@ final readonly class IlluminateEventStoreConfiguration
         public string $eventTableName,
         public ClockInterface $clock,
         public CommitRetryStrategy $commitRetryStrategy = new RetryCommitOnDeadLock(),
-        public BackoffStrategy $backoffStrategy = new BackoffLinearly(),
+        public BackoffStrategy $backoffStrategy = new BackoffExponentially(),
     ) {
     }
 
