@@ -13,7 +13,7 @@ final readonly class BackoffExponentially implements BackoffStrategy
         public int $maxAttempts = 10,
         public CarbonInterval $waitInitiallyFor = new CarbonInterval(seconds: 0.1),
         /** @var positive-int|float */
-        public int|float $rate = 2,
+        public int|float $rate = 3,
     ) {
     }
 
