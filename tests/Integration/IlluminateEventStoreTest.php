@@ -7,6 +7,7 @@ namespace EKvedaras\DCBEventStoreIlluminate\Tests\Integration;
 use EKvedaras\DCBEventStoreIlluminate\Tests\OrchestraTestBench;
 use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Sleep;
 use PHPUnit\Framework\Attributes\CoversClass;
 use EKvedaras\DCBEventStoreIlluminate\IlluminateEventStore;
 
@@ -25,6 +26,8 @@ final class IlluminateEventStoreTest extends EventStoreTestBase
         Assert::isInstanceOf($connection, Connection::class);
         $eventStore = IlluminateEventStore::create($connection, config('dcb_event_store.events_table_name'));
         $connection->table(config('dcb_event_store.events_table_name'))->truncate();
+
+        Sleep::fake();
 
         return $eventStore;
     }

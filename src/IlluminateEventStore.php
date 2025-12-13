@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace EKvedaras\DCBEventStoreIlluminate;
 
+use Carbon\CarbonInterval;
 use Closure;
 use Illuminate\Database\Connection;
 use Illuminate\Database\PostgresConnection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\QueryException;
+use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\LazyCollection;
+use Illuminate\Support\Sleep;
 use JsonException;
 use RuntimeException;
 use stdClass;
+use Throwable;
 use Webmozart\Assert\Assert;
 use Wwwision\DCBEventStore\EventStore;
 use Wwwision\DCBEventStore\EventStream;
@@ -33,14 +37,15 @@ use const JSON_THROW_ON_ERROR;
 final readonly class IlluminateEventStore implements EventStore
 {
     public function __construct(
-        private IlluminateEventStoreConfiguration $config
+        private IlluminateEventStoreConfiguration $config,
     ) {
     }
 
     public static function create(Connection $connection, string $eventTableName): self
     {
-        $config = IlluminateEventStoreConfiguration::create($connection, $eventTableName);
-        return new self($config);
+        return new self(
+            IlluminateEventStoreConfiguration::create($connection, $eventTableName),
+        );
     }
 
     public function read(StreamQuery $query, ?ReadOptions $options = null): EventStream
@@ -140,10 +145,9 @@ final readonly class IlluminateEventStore implements EventStore
     /** @param Closure(): int $statement */
     private function commit(Closure $statement): int
     {
-        // todo: make retry strategies configurable
-        $retryWaitInterval = 0.1;
-        $maxRetryAttempts = 10;
-        $retryAttempt = 0;
+        $retryWaitInterval = null;
+        $exhaustedRetryAttempts = 0;
+
         while (true) {
             try {
                 if ($this->config->connection instanceof PostgresConnection) {
@@ -155,16 +159,22 @@ final readonly class IlluminateEventStore implements EventStore
                 }
 
                 return $this->config->connection->transaction($statement);
-            } catch (QueryException $e) {
-                if ((int) $e->getCode() === 40001) {
-                    if ($retryAttempt >= $maxRetryAttempts) {
-                        throw new RuntimeException(sprintf('Failed after %d retry attempts', $retryAttempt), 1686565685, $e);
+            } catch (Throwable $e) {
+                if ($this->config->commitRetryStrategy->shouldRetry($e)) {
+                    if (!$this->config->backoffStrategy->canRetry($exhaustedRetryAttempts)) {
+                        throw new RuntimeException("Failed after {$exhaustedRetryAttempts} retry attempts", 1686565685, $e);
                     }
-                    usleep((int)($retryWaitInterval * 1E6));
-                    $retryAttempt ++;
-                    $retryWaitInterval *= 3;
+
+                    $retryWaitInterval = $this->config->backoffStrategy->getNextRetryWaitTime(
+                        current: $retryWaitInterval,
+                        exhaustedAttempts: $exhaustedRetryAttempts,
+                    );
+
+                    Sleep::for($retryWaitInterval);
+
+                    $exhaustedRetryAttempts++;
                 } else {
-                    throw new RuntimeException(sprintf('Failed to commit events (error code: %d): %s', (int)$e->getCode(), $e->getMessage()), 1685956215, $e);
+                    throw new RuntimeException("Failed to commit events (error code: {$e->getCode()}): {$e->getMessage()}", 1685956215, $e);
                 }
             } finally {
                 if ($this->config->connection instanceof PostgresConnection) {

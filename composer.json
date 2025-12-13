@@ -16,7 +16,8 @@
         "webmozart/assert": "^1.11",
         "wwwision/dcb-eventstore": "^4",
         "illuminate/database": "^11|^12",
-        "illuminate/support": "^11|^12"
+        "illuminate/support": "^11|^12",
+        "nesbot/carbon": "^3"
     },
     "require-dev": {
         "roave/security-advisories": "dev-latest",
@@ -46,8 +47,7 @@
         "test:cs": "phpcs --colors src",
         "test:cs:fix": "phpcbf --colors src",
         "test:integration": [
-            "echo $DCB_TEST_DSN",
-            "phpunit tests/Integration/IlluminateEventStoreTest.php --exclude-group=parallel --exclude-group=feature_liveStream --exclude-group=feature_appendConditionWithoutMatchingEvent"
+            "phpunit tests --exclude-group=parallel --exclude-group=validate --exclude-group=feature_liveStream --exclude-group=feature_appendConditionWithoutMatchingEvent"
         ],
         "test:consistency": [
             "EKvedaras\\DCBEventStoreIlluminate\\Tests\\Integration\\ConcurrencyTest::prepare",
