@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace EKvedaras\DCBEventStoreIlluminate;
 
+use DateTimeImmutable;
 use EKvedaras\DCBEventStoreIlluminate\CommitRetries\BackoffExponentially;
 use EKvedaras\DCBEventStoreIlluminate\CommitRetries\BackoffStrategy;
 use EKvedaras\DCBEventStoreIlluminate\CommitRetries\CommitRetryStrategy;
 use EKvedaras\DCBEventStoreIlluminate\CommitRetries\RetryCommitOnDeadLock;
 use Illuminate\Database\Connection;
 use Psr\Clock\ClockInterface;
-use Wwwision\DCBEventStore\Helpers\SystemClock;
 
 final readonly class IlluminateEventStoreConfiguration
 {
@@ -25,10 +25,16 @@ final readonly class IlluminateEventStoreConfiguration
 
     public static function create(Connection $connection, string $eventTableName): self
     {
+        $systemClock = new class implements ClockInterface {
+            public function now(): DateTimeImmutable
+            {
+                return new DateTimeImmutable();
+            }
+        };
         return new self(
             connection:     $connection,
             eventTableName: $eventTableName,
-            clock:          new SystemClock(),
+            clock:          $systemClock,
         );
     }
 
