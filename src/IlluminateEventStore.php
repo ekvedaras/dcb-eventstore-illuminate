@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace EKvedaras\DCBEventStoreIlluminate;
 
-use Carbon\CarbonInterval;
 use Closure;
+use DateTimeImmutable;
 use Illuminate\Database\Connection;
 use Illuminate\Database\PostgresConnection;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Database\QueryException;
-use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\LazyCollection;
 use Illuminate\Support\Sleep;
@@ -19,15 +17,18 @@ use RuntimeException;
 use stdClass;
 use Throwable;
 use Webmozart\Assert\Assert;
+use Wwwision\DCBEventStore\AppendCondition\AppendCondition;
+use Wwwision\DCBEventStore\Event\Event;
+use Wwwision\DCBEventStore\Event\Events;
 use Wwwision\DCBEventStore\EventStore;
-use Wwwision\DCBEventStore\EventStream;
 use Wwwision\DCBEventStore\Exceptions\ConditionalAppendFailed;
-use Wwwision\DCBEventStore\Types\AppendCondition;
-use Wwwision\DCBEventStore\Types\Event;
-use Wwwision\DCBEventStore\Types\Events;
-use Wwwision\DCBEventStore\Types\ReadOptions;
-use Wwwision\DCBEventStore\Types\StreamQuery\Criteria\EventTypesAndTagsCriterion;
-use Wwwision\DCBEventStore\Types\StreamQuery\StreamQuery;
+use Wwwision\DCBEventStore\Query\Query;
+use Wwwision\DCBEventStore\Query\QueryItem;
+use Wwwision\DCBEventStore\ReadOptions;
+use Wwwision\DCBEventStore\SequencedEvent\SequencedEvent;
+use Wwwision\DCBEventStore\SequencedEvent\SequencedEvents;
+
+use Wwwision\DCBEventStore\SequencedEvent\SequencePosition;
 
 use function json_encode;
 use function sprintf;
@@ -48,7 +49,7 @@ final readonly class IlluminateEventStore implements EventStore
         );
     }
 
-    public function read(StreamQuery $query, ?ReadOptions $options = null): EventStream
+    public function read(Query $query, ?ReadOptions $options = null): SequencedEvents
     {
         $backwards = $options->backwards ?? false;
         $queryBuilder = $this->config->connection
@@ -59,15 +60,21 @@ final readonly class IlluminateEventStore implements EventStore
             $operator = $backwards ? '<=' : '>=';
             $queryBuilder->where('events.sequence_number', $operator, $options->from->value);
         }
-        $this->addStreamQueryConstraints($queryBuilder, $query);
+        if ($options !== null && $options->limit !== null) {
+            $queryBuilder->limit($options->limit);
+        }
+        $this->applyQueryConstraints($queryBuilder, $query);
 
         /** @var LazyCollection<int, stdClass> $cursor */
         $cursor = $queryBuilder->cursor();
-
-        return new IlluminateEventStream($cursor);
+        return SequencedEvents::create(static function () use ($cursor) {
+            foreach ($cursor as $row) {
+                yield self::databaseRowToEventEnvelope((array)$row);
+            }
+        });
     }
 
-    public function append(Events|Event $events, AppendCondition $condition): void
+    public function append(Events|Event $events, ?AppendCondition $condition = null): void
     {
         Assert::eq($this->config->connection->transactionLevel(), 0, 'Failed to commit events because a database transaction is active already');
 
@@ -111,19 +118,20 @@ final readonly class IlluminateEventStore implements EventStore
         $newEvents = $this->config->connection
             ->table($selects, 'new_events')
             ->select($columns)
-            ->unless($condition->expectedHighestSequenceNumber->isAny(), function (Builder $query) use ($condition) {
+            ->unless($condition === null, function (Builder $query) use ($condition) {
+                Assert::notNull($condition);
                 $sequenceQuery = $this->config->connection
                     ->table($this->config->eventTableName, 'events')
                     ->select('events.sequence_number')
                     ->orderByDesc('events.sequence_number')
                     ->limit(1);
 
-                $this->addStreamQueryConstraints($sequenceQuery, $condition->query);
+                $this->applyQueryConstraints($sequenceQuery, $condition->failIfEventsMatch);
 
-                if ($condition->expectedHighestSequenceNumber->isNone()) {
+                if ($condition->after === null) {
                     $query->whereNotExists($sequenceQuery);
                 } else {
-                    $query->where(DB::raw($condition->expectedHighestSequenceNumber->extractSequenceNumber()->value), $sequenceQuery);
+                    $query->where(DB::raw($condition->after->value), $sequenceQuery);
                 }
 
                 return $query;
@@ -135,8 +143,8 @@ final readonly class IlluminateEventStore implements EventStore
             fn () => $insertQuery->insertUsing($columns, $newEvents)
         );
 
-        if ($affectedRows === 0 && !$condition->expectedHighestSequenceNumber->isAny()) {
-            throw $condition->expectedHighestSequenceNumber->isNone() ? ConditionalAppendFailed::becauseNoEventWhereExpected() : ConditionalAppendFailed::becauseHighestExpectedSequenceNumberDoesNotMatch($condition->expectedHighestSequenceNumber);
+        if ($affectedRows === 0 && $condition !== null) {
+            throw $condition->after === null ? ConditionalAppendFailed::becauseMatchingEventsExist() : ConditionalAppendFailed::becauseMatchingEventsExistAfterSequencePosition($condition->after);
         }
     }
 
@@ -184,17 +192,17 @@ final readonly class IlluminateEventStore implements EventStore
         }
     }
 
-    private function addStreamQueryConstraints(Builder $queryBuilder, StreamQuery $streamQuery): void
+    private function applyQueryConstraints(Builder $queryBuilder, Query $query): void
     {
-        if ($streamQuery->isWildcard()) {
+        if (!$query->hasItems()) {
             return;
         }
         $criterionSelects = null;
-        foreach ($streamQuery->criteria as $criterion) {
+        foreach ($query as $queryItem) {
             $select = $this->config->connection
                 ->table($this->config->eventTableName)
                 ->select('sequence_number');
-            $this->applyCriterionConstraints($criterion, $select);
+            $this->applyQueryItemConstraints($queryItem, $select);
 
             if (!isset($criterionSelects)) {
                 $criterionSelects = $select;
@@ -217,19 +225,48 @@ final readonly class IlluminateEventStore implements EventStore
         );
     }
 
-    private function applyCriterionConstraints(EventTypesAndTagsCriterion $criterion, Builder $queryBuilder): void
+    private function applyQueryItemConstraints(QueryItem $queryItem, Builder $queryBuilder): void
     {
-        if ($criterion->eventTypes !== null) {
-            $queryBuilder->whereIn('type', $criterion->eventTypes->toStringArray());
+        if ($queryItem->eventTypes !== null) {
+            $queryBuilder->whereIn('type', $queryItem->eventTypes->toStringArray());
         }
-        if ($criterion->tags !== null) {
-            foreach ($criterion->tags as $tag) {
+        if ($queryItem->tags !== null) {
+            foreach ($queryItem->tags as $tag) {
                 $queryBuilder->whereJsonContains('tags', $tag->value);
             }
         }
 
-        if ($criterion->onlyLastEvent) {
+        if ($queryItem->onlyLastEvent) {
             $queryBuilder->select(DB::raw('MAX(sequence_number) AS sequence_number'));
         }
+    }
+
+    /**
+     * @param array<string, scalar> $row
+     */
+    private static function databaseRowToEventEnvelope(array $row): SequencedEvent
+    {
+        Assert::numeric($row['sequence_number']);
+        Assert::string($row['type']);
+        Assert::string($row['recorded_at']);
+        Assert::true(is_array($row['data']) || is_string($row['data']));
+        Assert::true(is_null($row['tags']) || is_array($row['tags']) || is_string($row['tags']));
+        $tagsArray = json_decode($row['tags'], true, 512, JSON_THROW_ON_ERROR);
+        Assert::isList($tagsArray);
+        Assert::allString($tagsArray);
+        Assert::true(is_null($row['metadata']) || is_array($row['metadata']) || is_string($row['metadata']));
+
+        $recordedAt = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $row['recorded_at']);
+        Assert::isInstanceOf($recordedAt, DateTimeImmutable::class);
+        return new SequencedEvent(
+            SequencePosition::fromInteger((int)$row['sequence_number']),
+            $recordedAt,
+            Event::create(
+                $row['type'],
+                $row['data'],
+                $tagsArray,
+                $row['metadata'],
+            ),
+        );
     }
 }

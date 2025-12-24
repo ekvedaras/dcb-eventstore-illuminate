@@ -13,7 +13,6 @@ use Illuminate\Database\Connection;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
-use Wwwision\DCBEventStore\Helpers\SystemClock;
 
 #[CoversClass(IlluminateEventStoreConfiguration::class)]
 final class IlluminateEventStoreConfigurationTest extends TestCase
@@ -26,7 +25,7 @@ final class IlluminateEventStoreConfigurationTest extends TestCase
 
         self::assertSame($connection, $config->connection);
         self::assertSame('events', $config->eventTableName);
-        self::assertInstanceOf(SystemClock::class, $config->clock);
+        self::assertInstanceOf(ClockInterface::class, $config->clock);
         self::assertInstanceOf(RetryCommitOnDeadLock::class, $config->commitRetryStrategy);
         self::assertInstanceOf(BackoffExponentially::class, $config->backoffStrategy);
     }
