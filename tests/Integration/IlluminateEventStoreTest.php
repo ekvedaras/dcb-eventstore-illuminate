@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace EKvedaras\DCBEventStoreIlluminate\Tests\Integration;
 
+use EKvedaras\DCBEventStoreIlluminate\CommitRetries\BackoffExponentially;
 use EKvedaras\DCBEventStoreIlluminate\IlluminateEventStoreConfiguration;
 use EKvedaras\DCBEventStoreIlluminate\Tests\OrchestraTestBench;
 use Illuminate\Database\Connection;
@@ -26,7 +27,13 @@ final class IlluminateEventStoreTest extends EventStoreTestBase
         $connection = DB::connection('testing');
         Assert::isInstanceOf($connection, Connection::class);
         $eventStoreConfig = IlluminateEventStoreConfiguration::create($connection, config('dcb_event_store.events_table_name'))
-            ->withClock($this->getTestClock());
+            ->withClock($this->getTestClock())
+            ->withBackoffStrategy(
+                new BackoffExponentially(
+                    maxAttempts: 20,
+                    rate:        4,
+                )
+            );
         $eventStore = new IlluminateEventStore($eventStoreConfig);
         $connection->table(config('dcb_event_store.events_table_name'))->truncate();
 
