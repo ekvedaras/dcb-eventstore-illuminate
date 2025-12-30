@@ -21,8 +21,8 @@ return new class extends Migration {
             }
 
             Schema::table($tableName, function (Blueprint $table): void {
-                $table->index(['type'], 'idx_type');
-                $table->index(['type', 'sequence_number'], 'idx_type_sequence_number');
+                $table->index(['type'], "{$table->getTable()}_idx_type");
+                $table->index(['type', 'sequence_number'], "{$table->getTable()}_idx_type_sequence_number");
             });
         }
     }
@@ -34,8 +34,8 @@ return new class extends Migration {
         foreach ($tableNames as $tableName) {
             Assert::stringNotEmpty($tableName);
             Schema::table($tableName, function (Blueprint $table): void {
-                $table->dropIndex('idx_type');
-                $table->dropIndex('idx_type_sequence_number');
+                $table->dropIndex("{$table->getTable()}_idx_type");
+                $table->dropIndex("{$table->getTable()}_idx_type_sequence_number");
             });
         }
     }
